@@ -1,6 +1,11 @@
 #!/usr/bin/env python
+#
+#   This script takes tab delimited (excel) file and produces a json table
+#
+#   Usage:
+#       ./parse-file.py <input_path> <output_path>
+#
 
-# this script takes tab delimited (excel) file and produces a json table
 
 import sys
 import json
@@ -21,8 +26,14 @@ if __name__ == "__main__":
 
         rows.append(obj)
 
+
     # write json
-    with open('output/'+sys.argv[1].split('/')[-1].replace('.txt', '_out.json'), 'w') as f:
+    if sys.argv[2] in ['.', '..', './', '../']:
+        out_file = sys.argv[1].split('/')[-1]
+    else:
+        out_file = sys.argv[2]
+
+    with open(out_file, 'w') as f:
         json.dump(rows, f)
 
     print '\ndone'
