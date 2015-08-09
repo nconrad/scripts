@@ -4,22 +4,27 @@
 #       ./maps-to-json.py [save|save-all|convert] <file_name|directory> <workspace_path>
 #
 #   Params:
-#       save        : for saving a single file to kbase/patric workspaces,
-#                     must specify <file_name> (pending)
-#       save-all    : for saving entire directory to kbase/patric workspaces (pending),
-#                     must specify <directory> and <workspace_path>
-#       convert     : convert a directory of kgml to modelseed-ready JSON,
-#                     must specify <directory>
+
 #
+
+
 
 import io
 import json
 import sys
 import os
+import argparse
 from xml.dom import minidom
 
 from api.patric import workspace as wsclient
-#from api.kbase import workspace as wsclient
+from api.kbase import workspace as kbwsclient
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-f', '--file', help="file to upload")
+parser.add_argument('-d', '--dir', help="directory to upload")
+parser.add_argument('-w', '--ws', help="workspace path where files will be saved", required=True)
+parser.add_argument('-k', '--kbase', help="save to kbase workspace", action='store_true')
+args = parser.parse_args()
 
 with open(os.environ['HOME'] + '/.rastauth') as file:
     token = file.read()
@@ -30,7 +35,7 @@ with open(os.environ['HOME'] + '/.rastauth') as file:
 #fba = fbaclient.fbaModelServices('http://kbase.us/services/KBaseFBAModeling'); #kbase
 
 ws = wsclient.Workspace(token=token);           #patric
-#ws = wsclient.Workspace();                                                     #kbase
+kbws = kbwsclient.Workspace(url="https://ci.kbase.us/services/ws");                  #kbase
 
 
 
@@ -370,38 +375,44 @@ def getGroups(rxns):
     return groups
 
 
-def save_all(dir_name, ws_path):
+def save_all():
     print '\n\n*** Saving all json objects  ***\n'
 
-    os.chdir(dir_name)
+    os.chdir(args.dir)
 
-    for name in os.listdir(os.getcwd()):
-        if name.endswith('.json'):
-            json_data = open(name)
-            data = json.load(json_data)
-            map_id = 'map'+name[2:7]
+    if (not args.kbase):
+        for name in os.listdir(os.getcwd()):
+            if name.endswith('.json'):
+                json_data = open(name)
+                data = json.load(json_data)
+                map_id = 'map'+name[2:7]
+                meta = {'reaction_ids': ','.join(data['reaction_ids']),
+                        'compound_ids': ','.join(data['compound_ids']),
+                        'name': data['name']}
 
-            print 'saving map: '+ws_path+map_id
-            test = ws.create({'objects': [[ws_path+map_id, 'json', {}, data]], 'overwrite': True})
+                print 'saving map: '+ws_path+map_id
+                test = ws.create({'objects': [[ws_path+map_id, 'json', meta, data]], 'overwrite': True})
 
-            print
+                print
 
-#    for name in os.listdir(os.getcwd()):
-#        if name.endswith('.json'):
-#            json_data=open(name)
-#            data = json.load(json_data)
-#            map_id = 'map'+name[2:7]
-#
-#            print 'saving map: '+map_id
-#            test= ws.save_objects({'workspace': 'test49',
-#                    'objects': [{
-#                        'data': data,
-#                        'meta': {'reaction_ids': ','.join(data['reaction_ids']),
-#                                     'compound_ids': ','.join(data['compound_ids']),
-#                                     'name': data['name']},
-#                        'type': 'KBaseBiochem.MetabolicMap'}
-#                    ]})
-#            print
+    if (args.kbase):
+        for name in os.listdir(os.getcwd()):
+            if name.endswith('.json'):
+                json_data=open(name)
+                data = json.load(json_data)
+                map_id = 'map'+name[2:7]
+
+                print 'saving map:', map_id, 'to', args.ws
+                test= kbws.save_objects({'workspace': args.ws,
+                        'objects': [{
+                            'name': map_id,
+                            'data': data,
+                            'meta': {'reaction_ids': ','.join(data['reaction_ids']),
+                                         'compound_ids': ','.join(data['compound_ids']),
+                                         'name': data['name']},
+                            'type': 'KBaseBiochem.MetabolicMap'}
+                        ]})
+                print
 
 
 
@@ -419,10 +430,11 @@ def convert_all_data(dir_name):
 
 if __name__ == "__main__":
 
-    if (sys.argv[1] == 'save-all'):
-        save_all(sys.argv[2], sys.argv[3])
-    elif (sys.argv[1] == 'convert'):
-        convert_all_data(sys.argv[2])
+
+    save_all()
+
+    #elif (sys.argv[1] == 'convert'):
+    #    convert_all_data(sys.argv[2])
 
     #ws = wsclient.Workspace()
     # workspaces = ws.list_workspaces({})
